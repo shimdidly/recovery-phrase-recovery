@@ -1,46 +1,20 @@
 # BIP39 Tool
 
-A tool for converting BIP39 mnemonic phrases to addresses and private keys.
+A tool for recovering 12-word bitcoin recovery phrases when you only have 11 words.
 
 ## Online Version
 
-https://iancoleman.github.io/bip39/
 
-## Standalone offline version
 
-Download `bip39-standalone.html`
-
-Open the file in a browser by double clicking it.
-
-This can be compiled from source using the command `python compile.py`
 
 ## Usage
 
-Enter your BIP39 phrase into the 'BIP39 Phrase' field, or press
-'Generate Random Phrase'
+If you managed to only write down 11 words of your 12-word recovery phrase, this tool can find the missing word for you.
 
-If required, set the derivation path, although the defaults are quite usable.
+Your recovery phrase should NEVER be entered into an online website such as this one--however, if you already can't access your money because you are missing a word from your phrase, you really don't have much to lose.
 
-See the table for a list of addresses generated from the phrase.
+Enter the 11 words you have, the the order you have them, in the box and click start. The progress window below will update you with what is happening. Sit back and be patient--it can take anywhere from 0 to 10 minutes to find your phrase.
 
-Toggle columns to blank to easily copy/paste a single column of data, eg to
-import private keys into a wallet or supply someone with a list of addresses.
+## Credits
 
-The BIP32 keys can be used at [bip32.org](https://bip32.org) if desired.
-
-## Making changes
-
-Please do not make modifications to `bip39-standalone.html`, since they will
-be overwritten by `compile.py`.
-
-Make changes in `src/*` and apply them using the command `python compile.py`
-
-# Tests
-
-Tests depend on [phantomjs](http://phantomjs.org/).
-
-Run tests from the command-line
-
-```
-$ phantomjs tests.js
-```
+This program is based on Ian Coleman's excellent BIP39 tool, found at https://github.com/iancoleman/bip39
