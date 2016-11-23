@@ -41,7 +41,7 @@ for style in styles:
 
 # Write the standalone file
 
-f = open('bip39-standalone.html', 'w')
+f = open('index.html', 'w')
 f.write(page)
 f.close()
 
