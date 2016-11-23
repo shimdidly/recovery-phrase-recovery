@@ -2,7 +2,7 @@ import os
 import re
 import datetime
 
-# This script generates the bip39-standalone.html file.
+# This script generates the index.html file.
 
 # It removes script and style tags and replaces with the file content.
 
