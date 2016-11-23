@@ -20,6 +20,7 @@
   DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
 
   var possiblePhrases = [];
+  var possiblerPhrases = [];
 
   var progressLog = "";
 
@@ -27,6 +28,8 @@
   var testNo = 0;
   var wordNo = 0;
   var phraseNo = 0;
+  var lookupNo = 0;
+
   var working = 0;
   var checkedAddresses = 0;
 
@@ -98,6 +101,8 @@
     }
   }
 
+// Recovery methods
+
   function findAllPossiblePhrases() {
     // For each position...
     for (; testNo < testOrder.length; testNo++) {
@@ -149,7 +154,9 @@
     addProgress("Found " + possiblePhrases.length + " possibilities to check.");
     addProgress("Checking the blockchain for existing wallets...")
     addProgress("Progress:");
+    
     startTime();
+    setTimeout(checkAddressBatch, 10000);
     calculateAddresses();
   };
 
@@ -160,35 +167,115 @@
 
       var key = bip32ExtendedKey.derive(0);
       possiblePhrases[phraseNo].address = key.getAddress().toString();
+      possiblePhrases[phraseNo].lookupNo = lookupNo;
         
-      checkAddressStatus(key.getAddress().toString(), possiblePhrases[phraseNo].phrase);
+      //checkAddressStatus(key.getAddress().toString(), phraseNo);
       
       if (working == 1) {  
         updateProgress("Progress: " + phraseNo + " / "+ possiblePhrases.length + " (" + timeLeft(phraseNo, possiblePhrases.length - phraseNo) + " remaining)");
-        setTimeout(calculateAddresses, 1);
         phraseNo++;
+        setTimeout(calculateAddresses, 1);
       }
     } else {
       updateProgress("Progress: " + possiblePhrases.length + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
-      phraseNo = 0;
-      startTime();
     }  
   }
 
-  function checkAddressStatus(address, which) {
-    $.get("https://blockchain.info/q/getreceivedbyaddress/" + address, function (data) {
+  function checkAddressBatch() {
+    console.log("Sending batch " + lookupNo);
+
+    if (working == 0) return;    
+    var addressList = "";
+    var currLookup = lookupNo;
+    lookupNo++;
+    groupTotal = 0;
+    
+    for (var i = 0; i < possiblePhrases.length; i++) {
+      if (possiblePhrases[i].lookupNo == currLookup) {
+        addressList += possiblePhrases[i].address + "|";
+        checkedAddresses++;
+      }
+    }
+    addressList = addressList.substring(0, addressList.length - 1);
+      
+    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList, function (data) {
       if (data != 0) {
         working = 0;
-        succeed(which);
+        lookupNo = currLookup;
+
+        updateProgress("Progress: " + phraseNo + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
+        addProgress("Found something, analyzing...");
+        addProgress("Progress:");
+
+
+        for (var i = 0; i < possiblePhrases.length; i++) {
+          if (possiblePhrases[i].lookupNo == lookupNo) {
+            possiblerPhrases.push(possiblePhrases[i]);
+          }
+        }
+
+        lookupNo = 0;
+        checkIndividualAddresses();
       } else {
+        console.log("Got no hits.");
         if (checkedAddresses >= possiblePhrases.length) {
-          console.log(checkedAddresses + "  " + possiblePhrases.length);
           fail(); 
         };
+        setTimeout(checkAddressBatch, 10000);
       }
-      checkedAddresses++;
-    });
+    });  
+    
   }
+
+  function checkIndividualAddresses() {
+
+    //TODO ---- Split into groups of two, checking the aggregate of each group. repeat to figure out which address it is
+    // Count the number of splits there will be, beforehand so we can give an indicator.
+
+    if (lookupNo < possiblerPhrases.length) {
+      var which = lookupNo;
+      $.get("https://api.blockcypher.com/v1/btc/main/addrs/" + possiblerPhrases[which].address + "/balance", function (data) {
+
+          updateProgress("Progress: " + which + " / " + possiblerPhrases.length);
+          if (data.total_received > 0) {
+            succeed(possiblerPhrases[which].phrase);
+          } else {
+            setTimeout(checkIndividualAddresses, 333);
+          }
+      });
+      lookupNo++;
+    } else {
+      fail();
+    }
+
+  }
+    
+    // https://api.blockcypher.com/v1/btc/main/addrs/1DEP8i3QJCsomS4BSMY2RpU1upv62aGvhD/balance
+
+  // function checkAddressStatus(address, which) {
+
+  //   if (apiTimer - new Date() > 10000) {
+
+  //     var addressList = lookupQueue[0];
+  //     for (var i = 0; i < lookupQueue.length; i++) {
+  //       addressList+=
+  //     }
+
+  //     $.get("https://blockchain.info/q/getreceivedbyaddress/" + address, function (data) {
+  //     if (data != 0) {
+  //       working = 0;
+  //       succeed(which);
+  //     } else {
+  //       if (checkedAddresses >= possiblePhrases.length) {
+  //         console.log(checkedAddresses + "  " + possiblePhrases.length);
+  //         fail(); 
+  //       };
+  //     }
+  //     checkedAddresses++;
+  //   });
+  //   }    
+    
+  // }
 
   function calcBip32RootKeyFromSeed(phrase, passphrase) {
     seed = mnemonic.toSeed(phrase, passphrase);
@@ -405,12 +492,13 @@
 
   function succeed(phrase) {
     working = 2;
+    progressLog = "";
     addProgress("====================");
-    addProgress("********************");
+    addProgress("Success!!");
     addProgress("");
-    addProgress("Phrase found:  " + phrase);
+    addProgress("Your phrase has been found:  ");
+    addProgress(phrase);
     addProgress("");
-    addProgress("********************");
     addProgress("====================");
     addProgress("Refresh page if you want to start a new search.");
     addProgress("If you found this tool useful, consider sending a donation!");
