@@ -17,24 +17,45 @@
   DOM.languages = $(".languages a");
   DOM.progress = $(".progress");
 
+  // Set default phrase, for testing only (remove this)  
   DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
 
   var possiblePhrases = [];
-  var possiblerPhrases = [];
+  var batches = [[]];
+  var batch1, batch2;
 
   var progressLog = "";
 
-  var testOrder = [6,7,5,8,4,9,3,10,2,11,1,12];
-  var testNo = 0;
-  var wordNo = 0;
-  var phraseNo = 0;
-  var lookupNo = 0;
+  // Most mistakes happen in the middle of the phrase, so we start replacing words in the middle and move out.  
+  var testOrder = [6, 7, 5, 8, 4, 9, 3, 10, 2, 11, 1, 12];
+  
+  var n = {
+    test: 0, // which test position we are swapping words for
+    word: 0, // which word we're swapping
+    phrase: 0, // which phrase we are calculating an address for
+    batch: 0, // which batch we are looking up via api
+    batchaddr: 0, // how many addresses have been batched through api
+    singleaddr: 0, // how many addresses have been individually checked through api
+    totalsingleaddr: 0
+  }
 
-  var working = 0;
+  /*
+   * Status:
+   *    0 Stopped
+   *    1 Calculating phrases
+   *    2 Calculating addresses / Sending batches to API
+   *    3 Finished calculating addresses
+   *    4 Found a hit, narrowing it down via API
+   *    5 Done.
+   */
+
+  var status = 0;
+
   var checkedAddresses = 0;
 
+  // What the user has for their phrase, what language it's in, the word list for that language  
   var existingPhrase, language, words;
-
+  
   var processTimer;
 
   function init() {
@@ -43,7 +64,6 @@
     DOM.start.on("click", startClicked);
     hidePending();
     hideValidationError();
-    //populateNetworkSelect();
   }
 
   // Event handlers
@@ -61,9 +81,9 @@
     showPending();
     hideValidationError();
     setMnemonicLanguage();
+    DOM.phrase.val(DOM.phrase.val().toLowerCase());
     // Get the mnemonic phrase
-    var phrase = DOM.phrase.val();
-    var errorText = findPhraseErrors(phrase);
+    var errorText = findPhraseErrors(DOM.phrase.val());
     if (errorText) {
       showValidationError(errorText);
       return;
@@ -73,27 +93,45 @@
 
   function startClicked(event) {
     event.preventDefault();
-    
-    if (working == 0) {
-      progressLog = "";
-      working = 1;
+
+    if (status == 0) {
       
+      var validated = findPhraseErrors(DOM.phrase.val());    
+      if (validated != false) {
+        showValidationError(validated);
+        return;
+      }
+      
+      progressLog = "";
+      status = 1;
+
       DOM.start.text("Stop");
       DOM.phrase.attr("readOnly", true);
       addProgress("Generating possible combinations...");
       addProgress("Progress:");
-
+      
       existingPhrase = phraseToWordArray(DOM.phrase.val());
       language = getLanguage();
       words = WORDLISTS[language];
 
       startTime();
-      findAllPossiblePhrases();
-    } else if (working == 1) {
-      working = 0;
-      testNo = 0;
-      wordNo = 0;
-      phraseNo = 0;
+      runRecovery();
+
+    } else if (status == 5) {
+      // reset
+      status = 0;
+      n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
+
+      DOM.phrase.attr("readOnly", false);
+      DOM.start.text("Start");
+      progressLog = "";
+      DOM.progress.html = "";
+
+    } else {
+
+      // Stop and reset
+      status = 0;
+      n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
 
       DOM.phrase.attr("readOnly", false);
       DOM.start.text("Start");
@@ -101,181 +139,227 @@
     }
   }
 
+  // Time-consuming loops can completely lock up the browser, so we use timeouts to break up each loop into segments and give the browser time to do other things in between. 
+  // At the end of each segment, call runRecovery with settimeout, and based on the global "status" runrecovery will call the next segment to run.
+  
+  function runRecovery() {
+    switch (status) {
+      case 0:
+        break;
+      case 1:
+        generatePhrases();
+        break;
+      case 2:
+        calculateAddresses();
+        break;
+      case 3:
+        break;
+      case 4:
+        divideAndConquer();
+        break;
+      case 5:
+        break;
+    }
+  }
+
 // Recovery methods
 
-  function findAllPossiblePhrases() {
-    // For each position...
-    for (; testNo < testOrder.length; testNo++) {
-      var toReplace = testOrder[testNo] - 1;
-      // Swap in each word in the list....
-      for (; wordNo < words.length; wordNo++) {
-        var testPhrase = [];
+  function generatePhrases() {
+    
+    if (n.word >= words.length) {
+      n.test++;
+      n.word = 0;
+    }
+    
+    if (n.test >= testOrder.length) {
+      // All phrases generated
+      status = 2;
 
-        // Generate phrase to test...
+      updateProgress("Progress: 24576 / 24576 (Took " + parseTime(stopTime()) + ")");
+
+      addProgress("Found " + possiblePhrases.length + " possibilities.");
+      addProgress("Checking the blockchain for existing wallets...")
+      addProgress("Progress:");
+    
+      startTime();
+      setTimeout(checkAddressBatch, 10000);
+      setTimeout(runRecovery, 0);
+      return;
+    }
+    
+    var toReplace = testOrder[n.test] - 1;
+
+    for (; n.word < words.length; n.word++) {
+      var testPhrase = [];
+
+      // Generate phrase to test...
+
+      if (existingPhrase.length == 11) {
+       // If 11 words present
         for (var i = 0; i < 12; i++) {
           if (i < toReplace) {
             testPhrase.push(existingPhrase[i]);
           } else if (i > toReplace) {
-            testPhrase.push(existingPhrase[i-1]);
+            testPhrase.push(existingPhrase[i - 1]);
           } else {
-            testPhrase.push(words[wordNo]);
-          }   
-        }
-
-        testPhrase = wordArrayToPhrase(testPhrase, language);
-
-        // Check validity
-        var isValid = mnemonic.check(testPhrase);
-
-        if (isValid) {
-          // Add possibility
-          possiblePhrases.push({phrase: testPhrase});
-        }
-
-        if (wordNo % 100 == 0) {
-          if (working == 1) {
-            var done = (wordNo + (testNo * 2048));
-            var remaining = 24576 - done;
-            updateProgress("Progress: " + done + " / 24576");
-            setTimeout(findAllPossiblePhrases, 1);
-            wordNo++;
-            return;
-          } else {
-            return;
+            testPhrase.push(words[n.word]);
           }
-          
         }
+
+      } else {
+        // If 12 words present
+        for (var i = 0; i < 12; i++) {
+          if (i == toReplace) {
+            testPhrase.push(words[n.word]);
+          } else {
+            testPhrase.push(existingPhrase[i]);
+          }
+        }
+      }      
+
+      testPhrase = wordArrayToPhrase(testPhrase, language);
+
+      // Check validity
+      var isValid = mnemonic.check(testPhrase);
+
+      if (isValid) {
+        // Add possibility
+        possiblePhrases.push(testPhrase);
       }
-      wordNo = 0;
+
+      if (n.word % 100 == 0) {
+        var done = (n.word + (n.test * 2048));
+        var remaining = 24576 - done;
+        updateProgress("Progress: " + done + " / 24576");
+        n.word++
+        break;
+      }
     }
-
-    updateProgress("Progress: 24576 / 24576 (Took " + parseTime(stopTime()) + ")");
-
-    addProgress("Found " + possiblePhrases.length + " possibilities to check.");
-    addProgress("Checking the blockchain for existing wallets...")
-    addProgress("Progress:");
-    
-    startTime();
-    setTimeout(checkAddressBatch, 10000);
-    calculateAddresses();
-  };
-
-  function calculateAddresses() {
-    if (phraseNo < possiblePhrases.length) {
-      calcBip32RootKeyFromSeed(possiblePhrases[phraseNo].phrase, "");
-      calcBip32ExtendedKey("m/0'/0");
-
-      var key = bip32ExtendedKey.derive(0);
-      possiblePhrases[phraseNo].address = key.getAddress().toString();
-      possiblePhrases[phraseNo].lookupNo = lookupNo;
-        
-      //checkAddressStatus(key.getAddress().toString(), phraseNo);
-      
-      if (working == 1) {  
-        updateProgress("Progress: " + phraseNo + " / "+ possiblePhrases.length + " (" + timeLeft(phraseNo, possiblePhrases.length - phraseNo) + " remaining)");
-        phraseNo++;
-        setTimeout(calculateAddresses, 1);
-      }
-    } else {
-      updateProgress("Progress: " + possiblePhrases.length + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
-    }  
+    setTimeout(runRecovery, 0);
   }
 
-  function checkAddressBatch() {
-    console.log("Sending batch " + lookupNo);
-
-    if (working == 0) return;    
-    var addressList = "";
-    var currLookup = lookupNo;
-    lookupNo++;
-    groupTotal = 0;
-    
-    for (var i = 0; i < possiblePhrases.length; i++) {
-      if (possiblePhrases[i].lookupNo == currLookup) {
-        addressList += possiblePhrases[i].address + "|";
-        checkedAddresses++;
-      }
+  function calculateAddresses() {
+    if (n.phrase >= possiblePhrases.length) {
+      // Finished calculating addresses. Just waiting on api callbacks.
+      status = 3;
+      updateProgress("Progress: " + possiblePhrases.length + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
+      addProgress("Reviewing...")
+      return;
     }
-    addressList = addressList.substring(0, addressList.length - 1);
+
+    calcBip32RootKeyFromSeed(possiblePhrases[n.phrase], "");
+    calcBip32ExtendedKey("m/0'/0");
+
+    var key = bip32ExtendedKey.derive(0);
+
+    batches[n.batch].push({ phrase: possiblePhrases[n.phrase], address: key.getAddress().toString()});
+          
+    updateProgress("Progress: " + n.phrase + " / "+ possiblePhrases.length + " (" + timeLeft(n.phrase, possiblePhrases.length - n.phrase) + " remaining)");
+    n.phrase++;
+    setTimeout(runRecovery, 0);
+  }
+
+  // TODO Checkaddressbatch timeout doesn't stop if on status 3. Should stop. Also, if before last api reply but after last request sent, should say "thinking..." or something. If we find a hit, it shouldn't show up.
+
+
+  // The API is rate limited, so we ask for the status of multiple keys with one call
+  function checkAddressBatch() {
+    console.log("Sending batch " + n.batch);
+
+    if (status == 0) return; 
+    
+    var addressList = "";
+    var currBatch = n.batch;
+    n.batch++;
+    batches[n.batch] = [];
+
+    for (var i = 0; i < batches[currBatch].length; i++) {
+      addressList += batches[currBatch][i].address;
+      if (i < batches[currBatch].length - 1) addressList += "|";
+      n.batchaddr++;
+    }
       
     $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList, function (data) {
-      if (data != 0) {
-        working = 0;
-        lookupNo = currLookup;
 
-        updateProgress("Progress: " + phraseNo + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
+      //TODO error handling. Set status to 0 and push error if API problem.
+
+      if (data != 0) {
+        status = 4;
+
+        // Get number of divides required, so we can give a visual indicator
+        n.totalsingleaddr = calcSplitTimes(batches[currBatch].length);
+
+        splitBatch(batches[currBatch]);
+        
+        updateProgress("Progress: " + n.phrase + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
         addProgress("Found something, analyzing...");
         addProgress("Progress:");
 
+        setTimeout(runRecovery, 0);
 
-        for (var i = 0; i < possiblePhrases.length; i++) {
-          if (possiblePhrases[i].lookupNo == lookupNo) {
-            possiblerPhrases.push(possiblePhrases[i]);
-          }
-        }
-
-        lookupNo = 0;
-        checkIndividualAddresses();
       } else {
         console.log("Got no hits.");
-        if (checkedAddresses >= possiblePhrases.length) {
-          fail(); 
-        };
-        setTimeout(checkAddressBatch, 10000);
+        if (n.batchaddr >= possiblePhrases.length) {
+          fail();
+        } else {
+          setTimeout(checkAddressBatch, 10000);
+        }
       }
     });  
-    
   }
 
-  function checkIndividualAddresses() {
+  function divideAndConquer() {
 
-    //TODO ---- Split into groups of two, checking the aggregate of each group. repeat to figure out which address it is
-    // Count the number of splits there will be, beforehand so we can give an indicator.
-
-    if (lookupNo < possiblerPhrases.length) {
-      var which = lookupNo;
-      $.get("https://api.blockcypher.com/v1/btc/main/addrs/" + possiblerPhrases[which].address + "/balance", function (data) {
-
-          updateProgress("Progress: " + which + " / " + possiblerPhrases.length);
-          if (data.total_received > 0) {
-            succeed(possiblerPhrases[which].phrase);
-          } else {
-            setTimeout(checkIndividualAddresses, 333);
-          }
-      });
-      lookupNo++;
-    } else {
-      fail();
+    var addressList = "";    
+    for (var i = 0; i < batch1.length; i++) {
+      addressList += batch1[i].address;
+      if (i < batch1.length - 1) addressList += "|";
     }
 
+    console.log(addressList);    
+    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList, function (data) {
+
+      updateProgress("Progress: " + n.singleaddr + " / " + n.totalsingleaddr);
+      n.singleaddr++;
+
+      if (data != 0) {
+        if (batch1.length == 1) {
+          console.log(batch1[0].address);
+          succeed(batch1[0].phrase);
+          return;
+        } else {
+          console.log("Found in batch one, splitting " + batch1.length + " addresses into two.");
+          splitBatch(batch1);
+          setTimeout(runRecovery, 5000);
+        }
+      } else {
+        if (batch2.length == 1) {
+          console.log(batch2[0].address);
+          succeed(batch2[0].phrase);
+          return;
+        } else {
+          console.log("Found in batch two, splitting " + batch2.length + " addresses into two.");
+          splitBatch(batch2);
+          setTimeout(runRecovery, 5000);
+        }
+      }        
+    });      
   }
-    
-    // https://api.blockcypher.com/v1/btc/main/addrs/1DEP8i3QJCsomS4BSMY2RpU1upv62aGvhD/balance
 
-  // function checkAddressStatus(address, which) {
+  function splitBatch(batch) {
+    var oldBatch = batch;
+    var cutoff = Math.floor(batch.length / 2);
+    batch1 = [];
+    batch2 = [];
 
-  //   if (apiTimer - new Date() > 10000) {
+    for (var i = 0; i < cutoff; i++) {
+      batch1.push(batch[i]);
+    }
 
-  //     var addressList = lookupQueue[0];
-  //     for (var i = 0; i < lookupQueue.length; i++) {
-  //       addressList+=
-  //     }
-
-  //     $.get("https://blockchain.info/q/getreceivedbyaddress/" + address, function (data) {
-  //     if (data != 0) {
-  //       working = 0;
-  //       succeed(which);
-  //     } else {
-  //       if (checkedAddresses >= possiblePhrases.length) {
-  //         console.log(checkedAddresses + "  " + possiblePhrases.length);
-  //         fail(); 
-  //       };
-  //     }
-  //     checkedAddresses++;
-  //   });
-  //   }    
-    
-  // }
+    for (; cutoff < batch.length; cutoff++) {
+      batch2.push(batch[cutoff]);
+    }
+  }
 
   function calcBip32RootKeyFromSeed(phrase, passphrase) {
     seed = mnemonic.toSeed(phrase, passphrase);
@@ -318,7 +402,7 @@
     // Preprocess the words
     phrase = mnemonic.normalizeString(phrase);
     var words = phraseToWordArray(phrase);
-    if (words.length != 11) return "Must have 11 words of phrase.";
+    if (words.length < 11 || words.length > 12) return "Must have 11 or 12 words of phrase.";
     // Check each word
     for (var i=0; i<words.length; i++) {
       var word = words[i];
@@ -431,7 +515,6 @@
     mnemonic = mnemonics[language];
   }
 
-  // TODO look at jsbip39 - mnemonic.splitWords
   function phraseToWordArray(phrase) {
     var words = phrase.split(/\s/g);
     var noBlanks = [];
@@ -444,7 +527,6 @@
     return noBlanks;
   }
 
-  // TODO look at jsbip39 - mnemonic.joinWords
   function wordArrayToPhrase(words, language) {
     var phrase = words.join(" ");
     if (typeof language == "undefined") language = getLanguageFromPhrase(phrase);
@@ -455,19 +537,18 @@
   }
 
   function addProgress(text) {
-    progressLog += text + "\n";
-    DOM.progress.text(progressLog);
+    progressLog += text + "<br>";
+    DOM.progress.html(progressLog);
   }
 
   function updateProgress(text) {
-    var old =progressLog.substring(0,progressLog.lastIndexOf("\n", progressLog.length - 3));
-    progressLog = old + "\n" + text + "\n";
-    DOM.progress.text(progressLog);
+    var old =progressLog.substring(0,progressLog.lastIndexOf("<br>", progressLog.length - 5));
+    progressLog = old + "<br>" + text + "<br>";
+    DOM.progress.html(progressLog);
   }
 
   function timeLeft(done, remain) {
     var soFar = Math.round(new Date() / 1000) - processTimer;
-    
     var left = Math.round((soFar / done) * remain);
     return parseTime(left);    
   }
@@ -490,31 +571,49 @@
     return Math.round((new Date() / 1000)) - processTimer;
   }
 
+  function calcSplitTimes(items) {
+    var splits = 0;
+    while (items > 1) {
+      items = Math.floor(items / 2);
+      splits++;
+    }
+    return splits;
+  }
+
+  function comparePhraseForDisplay(phrase) {
+    var wordArray = phraseToWordArray(phrase);
+    for (var i = 0; i < wordArray.length; i++) {
+      if (wordArray[i] != existingPhrase[i]) {
+        wordArray[i] = '<span class="missingWord">' + wordArray[i] + '</span>';
+        break;
+      }
+    }
+    return wordArray.join(" ");
+  }
+
   function succeed(phrase) {
-    working = 2;
-    progressLog = "";
+    status = 5;
+    DOM.start.text("Reset");
+    //progressLog = ""; #Uncomment to clear screen before printing success message
     addProgress("====================");
     addProgress("Success!!");
     addProgress("");
     addProgress("Your phrase has been found:  ");
-    addProgress(phrase);
+    addProgress('<span class="foundPhrase">' + comparePhraseForDisplay(phrase) + '</span>');
     addProgress("");
     addProgress("====================");
-    addProgress("Refresh page if you want to start a new search.");
     addProgress("If you found this tool useful, consider sending a donation!");
 
   }
 
   function fail() {
-    working = 2;
+    status = 5;
+    DOM.start.text("Reset");
     addProgress("====================");
-    addProgress("********************");
     addProgress("");
-    addProgress("Unfortunately, no valid phrase was found.");
+    addProgress('<span class="foundPhrase">Unfortunately, no valid phrase was found.</span>');
     addProgress("");
-    addProgress("********************");
     addProgress("====================");
-    addProgress("Refresh page if you want to start a new search.");
     addProgress("If you found this tool useful, consider sending a donation!");
   }
 
