@@ -11,52 +11,64 @@
 </head>
 <body>
   <div class="container">
-    <h1 class="text-center">Recovery Phrase Recovery Tool</h1>
-    <hr>
+    <h1 class="text-center title">Recovery Phrase Recovery Tool</h1>
+    <div class="readme-box">
+        <div class="row">
+            <div class="col-md-12">
+            <h3>What is it?</h3>
+            <p>
+                If you wrote down a BIP32/breadwallet/Hive 12-word recovery phrase, but
+                somehow ended up with only 11 words or your phrase is considered invalid, 
+                this tool can try to repair your phrase for you. You must have <i>either</i> 11 words of your phrase in the
+                correct order, <i>or</i> 12 words of your phrase with one of the words being
+                incorrect (resulting in a "bad phrase" error message).
+            </p>
+            <h3>Disclaimer</h3>
+            <p>
+                This page is not affiliated with any company or product, and is
+                provided as-is for users who are interested in using it. By using this
+                site, <b>you agree to assume all risk</b>. The author of this software will not
+                be held responsible if the security of your bitcoin wallet is
+                compromised as a result of using this site.
+            </p>
+            <h3>How can I remain safe?</h3>
+            <p>
+                This page is 100% open source, which means anyone is free to view the source code 
+                and ensure the software is not designed to steal your bitcoin. However, 
+                entering your phrase into a computer or website is generally a bad idea, as it could be copied by 
+                malware, keyloggers, network eavesdroppers, or even people viewing your screen. As soon as you recover your funds, 
+                please move them to a new wallet and discontinue use of any recovery phrases you enter here. 
+            </p>
+            </div>
+        </div>
     <div class="row">
-      <div class="col-md-12">
-        <h3>What is it?</h3>
-        <p>
-          If you wrote down a BIP32/breadwallet 12-word recovery phrase, but
-          somehow ended up with only 11 words or your phrase is considered invalid
-          , this tool can try to repair your phrase for you.
-        </p>
-        <p>
-          To use this tool, you must have EITHER 11 words of your phrase in the
-          correct order, OR 12 words of your phrase with one of the words being
-          incorrect (resulting in a "bad phrase" error message).
-        </p>
-        <h3>Disclaimer</h3>
-        <p>
-          <b>This page is not affiliated with any company or product</b>, and is
-          provided as-is for users who are interested in using it. By using this
-          site, you agree to assume all risk. The author of this software will not
-          be held responsible if the security of your bitcoin wallet is
-          compromised as a result of using this site.
-        </p>
-        <p>
-          That said, this software is 100% open source, and has been checked to
-          ensure it is safe to use.
-        </p>
+      <div class="col-md-12 textcenter">
+          <div class="col-md-3"></div>
+          <div class="col-md-6 disclaimer-text">
+            <input type="checkbox" class="disclaimer">
+            I understand the risks of using this site and take full responsibility.
+          </div>
       </div>
     </div>
-    <hr>
-    <div class="row">
-      <div class="col-md-12">
-        If you understand the risks and wish to continue, enter your phrase as you
-        have it written down in the box below, and click "start" to begin.
-      </div>
     </div>
+    <br>
     <div class="row">
-      <div class="col-md-12">
-        <br>
+      <div class="col-md-1"></div>
+      <div class="col-md-8">
         <form>
           <div class="form-group">
-            <input id="phrase" class="phrase form-control"></input>
+            <input id="phrase" class="phrase form-control" readOnly value="Please accept the disclaimer above to continue."></input>
           </div>
+      </div>
+      <div class="col-md-2">
           <div class="form-group">
-            <button class="btn start">Start</button>
+            <button class="btn start greyed">Start</button>
           </div>
+      </div>
+    </div>
+    <div class="row">
+        <div class="col-md-2"></div>
+        <div class="col-md-8">
           <div class="form-group progress-container">
             <div class="progress"></div>
           </div>
@@ -119,8 +131,11 @@
   </div>
 
   <div class="feedback-container">
-  <div class="feedback alert alert-danger">Loading...</div>
+  <div class="feedback alert alert-danger" style="display:none">Loading...</div>
+  <div class="pending alert alert-info">Loading...</div>
   </div>
+
+  
 
   <script type="text/template" id="address-row-template">
     <tr>

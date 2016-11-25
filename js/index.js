@@ -13,13 +13,14 @@
   var DOM = {};
   DOM.phrase = $(".phrase");
   DOM.start = $(".start");
+  DOM.disclaimer = $(".disclaimer");
   DOM.feedback = $(".feedback");
-  DOM.languages = $(".languages a");
+  DOM.pending = $(".pending");
   DOM.progress = $(".progress");
 
   // Set default phrase, for testing only (remove this)  
   //DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
-  DOM.phrase.val("axis husband project any sea time drip tip spirit tide bring belt");
+  //DOM.phrase.val("axis husband project any sea time drip tip spirit tide bring belt");
   var possiblePhrases = [];
   var batches = [[]];
   var batch1, batch2;
@@ -52,11 +53,27 @@
     // Events
     DOM.phrase.on("input", delayedPhraseChanged);
     DOM.start.on("click", startClicked);
+    DOM.disclaimer.change(disclaimed);
+
+    DOM.phrase.focus(function(){
+        if($(this).val() == "Enter your phrase here.") $(this).val("");
+      }).blur(function(){
+        if($(this).val() == "")$(this).val("Enter your phrase here.");
+      });
     hidePending();
     hideValidationError();
   }
 
   // Event handlers
+
+  function disclaimed() {
+    if (DOM.disclaimer.is(':checked')) {
+      DOM.disclaimer.attr("disabled", true);
+      DOM.phrase.attr("readOnly", false);
+      DOM.phrase.val("Enter your phrase here.");
+      DOM.start.removeClass("greyed").addClass("start-btn");
+    }
+  }
 
   function delayedPhraseChanged() {
     hideValidationError();
@@ -71,9 +88,8 @@
     showPending();
     hideValidationError();
     setMnemonicLanguage();
-    DOM.phrase.val(DOM.phrase.val().toLowerCase());
     // Get the mnemonic phrase
-    var errorText = findPhraseErrors(DOM.phrase.val());
+    var errorText = findPhraseErrors(DOM.phrase.val().toLowerCase());
     if (errorText) {
       showValidationError(errorText);
       return;
@@ -86,8 +102,6 @@
 
     if (status == 0) {
       startRecovery();
-    } else if (status == 5) {
-      resetRecovery();
     } else {
       stopRecovery();
     }
@@ -106,11 +120,12 @@
     status = 1;
 
     DOM.start.text("Stop");
+    DOM.start.removeClass("start-btn").addClass("stop-btn");
     DOM.phrase.attr("readOnly", true);
     addProgress("Generating possible combinations...");
     addProgress("Progress:");
     
-    existingPhrase = phraseToWordArray(DOM.phrase.val());
+    existingPhrase = phraseToWordArray(DOM.phrase.val().toLowerCase());
     language = getLanguage();
     words = WORDLISTS[language];
 
@@ -118,26 +133,21 @@
     runRecovery();
   }
 
-  function resetRecovery() {
-    // reset
-    status = 0;
-    n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
-
-    DOM.phrase.attr("readOnly", false);
-    DOM.start.text("Start");
-    progressLog = "";
-    DOM.progress.html("");
-
-  }
-
   function stopRecovery() {
-    // Stop and reset
+    if (status == 5) {
+      DOM.progress.removeClass("success fail");
+      progressLog = "";
+      DOM.progress.html("");
+    } else {
+      addProgress("Aborted.");
+    }
+ 
     status = 0;
-    n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
+    n = { test: 0, word: 0, phrase: 0, batch: 0, singleaddr: 0 }
 
     DOM.phrase.attr("readOnly", false);
     DOM.start.text("Start");
-    addProgress("Aborted.");
+    DOM.start.removeClass("stop-btn").addClass("start-btn");
   }
 
   // Process management
@@ -319,7 +329,7 @@
         
         updateProgress("Progress: " + n.phrase + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
         addProgress("Found something, analyzing...");
-        addProgress("Progress:");
+        addProgress("Progress: 0 / 7");
 
       } else {
         console.log("Got no hits.");
@@ -421,6 +431,7 @@
   }
 
   function showValidationError(errorText) {
+    hidePending();
     DOM.feedback
       .text(errorText)
       .show();
@@ -436,7 +447,7 @@
     // Preprocess the words
     phrase = mnemonic.normalizeString(phrase);
     var words = phraseToWordArray(phrase);
-    if (words.length < 11 || words.length > 12) return "Must have 11 or 12 words of phrase.";
+    
     // Check each word
     for (var i=0; i<words.length; i++) {
       var word = words[i];
@@ -444,9 +455,12 @@
       if (WORDLISTS[language].indexOf(word) == -1) {
         console.log("Finding closest match to " + word);
         var nearestWord = findNearestWord(word);
-        return word + " not in wordlist, did you mean " + nearestWord + "?";
+        return '"' + word.charAt(0).toUpperCase() + word.slice(1) + '" is not a valid word. Did you mean "' + nearestWord + '"?';
       }
     }
+
+    if ((words.length < 11 || words.length > 12) && words.length != 0) return "Must have 11 or 12 words of phrase.";
+    
     return false;
   }
 
@@ -459,13 +473,14 @@
   }
 
   function showPending() {
-    DOM.feedback
-      .text("Calculating...")
+    hideValidationError();
+    DOM.pending
+      .text("Checking...")
       .show();
   }
 
   function hidePending() {
-    DOM.feedback
+    DOM.pending
       .text("")
       .hide();
   }
@@ -616,39 +631,35 @@
 
   function comparePhraseForDisplay(phrase) {
     var wordArray = phraseToWordArray(phrase);
-    for (var i = 0; i < wordArray.length; i++) {
+    for (var i = 0; i < wordArray.length; i++) { 
       if (wordArray[i] != existingPhrase[i]) {
         wordArray[i] = '<span class="missingWord">' + wordArray[i] + '</span>';
         break;
       }
     }
+    wordArray[6] = '<br>' + wordArray[6];
     return wordArray.join(" ");
   }
 
   function succeed(phrase) {
     status = 5;
     DOM.start.text("Reset");
-    //progressLog = ""; #Uncomment to clear screen before printing success message
-    addProgress("====================");
-    addProgress("Success!!");
-    addProgress("");
-    addProgress("Your phrase has been found:  ");
-    addProgress('<span class="foundPhrase">' + comparePhraseForDisplay(phrase) + '</span>');
-    addProgress("");
-    addProgress("====================");
-    addProgress("If you found this tool useful, consider sending a donation!");
 
+    DOM.progress.addClass("success");
+    progressLog = '<div>Success! Your correct phrase is below: <br></div>' +
+      '<div class="foundPhrase">' + comparePhraseForDisplay(phrase) + '</div>' +
+      '<div class="donation-box">If you found this tool helpful, please consider making a donation to ' +
+      '<a href="bitcoin://3NSgVhvdMdo6roBRBTafgk1UrBZmecgANv">3NSgVhvdMdo6roBRBTafgk1UrBZmecgANv</a> ➠</div>' +
+      '<img src="images/qr_code.jpg" class="donation-image">';
+    
+    DOM.progress.html(progressLog);
   }
 
   function fail() {
     status = 5;
     DOM.start.text("Reset");
-    addProgress("====================");
-    addProgress("");
-    addProgress('<span class="foundPhrase">Unfortunately, no valid phrase was found.</span>');
-    addProgress("");
-    addProgress("====================");
-    addProgress("If you found this tool useful, consider sending a donation!");
+    DOM.progress.addClass("fail");
+    addProgress('<br><br><span class="foundPhrase">Unfortunately, no valid phrase was found.</span>');
   }
 
   init();
