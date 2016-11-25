@@ -1,0 +1,28 @@
+{
+  "name": "recovery-phrase-recovery",
+  "version": "1.0.0",
+  "description": "A tool for recovering 12-word bitcoin recovery phrases when you only have 11 words.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rublev/recovery-phrase-recovery.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rublev/recovery-phrase-recovery/issues"
+  },
+  "homepage": "https://github.com/rublev/recovery-phrase-recovery#readme",
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-contrib-jshint": "^1.1.0",
+    "grunt-contrib-uglify": "^2.0.0",
+    "grunt-contrib-watch": "^1.0.0",
+    "jit-grunt": "^0.10.0",
+    "time-grunt": "^1.4.0"
+  }
+}
