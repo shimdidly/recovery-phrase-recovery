@@ -18,8 +18,8 @@
   DOM.progress = $(".progress");
 
   // Set default phrase, for testing only (remove this)  
-  DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
-
+  //DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
+  DOM.phrase.val("axis husband project any sea time drip tip spirit tide bring belt");
   var possiblePhrases = [];
   var batches = [[]];
   var batch1, batch2;
@@ -29,34 +29,24 @@
   // Most mistakes happen in the middle of the phrase, so we start replacing words in the middle and move out.  
   var testOrder = [6, 7, 5, 8, 4, 9, 3, 10, 2, 11, 1, 12];
   
-  var n = {
+  var n = { // universal counters
     test: 0, // which test position we are swapping words for
     word: 0, // which word we're swapping
     phrase: 0, // which phrase we are calculating an address for
     batch: 0, // which batch we are looking up via api
     batchaddr: 0, // how many addresses have been batched through api
     singleaddr: 0, // how many addresses have been individually checked through api
-    totalsingleaddr: 0
+    totalsingleaddr: 0 //
   }
 
-  /*
-   * Status:
-   *    0 Stopped
-   *    1 Calculating phrases
-   *    2 Calculating addresses / Sending batches to API
-   *    3 Finished calculating addresses
-   *    4 Found a hit, narrowing it down via API
-   *    5 Done.
-   */
-
   var status = 0;
-
-  var checkedAddresses = 0;
 
   // What the user has for their phrase, what language it's in, the word list for that language  
   var existingPhrase, language, words;
   
+  var errorCount = 0;
   var processTimer;
+  var apiTimer = 0;
 
   function init() {
     // Events
@@ -95,53 +85,75 @@
     event.preventDefault();
 
     if (status == 0) {
-      
-      var validated = findPhraseErrors(DOM.phrase.val());    
-      if (validated != false) {
-        showValidationError(validated);
-        return;
-      }
-      
-      progressLog = "";
-      status = 1;
-
-      DOM.start.text("Stop");
-      DOM.phrase.attr("readOnly", true);
-      addProgress("Generating possible combinations...");
-      addProgress("Progress:");
-      
-      existingPhrase = phraseToWordArray(DOM.phrase.val());
-      language = getLanguage();
-      words = WORDLISTS[language];
-
-      startTime();
-      runRecovery();
-
+      startRecovery();
     } else if (status == 5) {
-      // reset
-      status = 0;
-      n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
-
-      DOM.phrase.attr("readOnly", false);
-      DOM.start.text("Start");
-      progressLog = "";
-      DOM.progress.html = "";
-
+      resetRecovery();
     } else {
-
-      // Stop and reset
-      status = 0;
-      n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
-
-      DOM.phrase.attr("readOnly", false);
-      DOM.start.text("Start");
-      addProgress("Aborted.");
+      stopRecovery();
     }
   }
 
+// Button actions
+
+  function startRecovery() {
+    var validated = findPhraseErrors(DOM.phrase.val());    
+    if (validated != false) {
+      showValidationError(validated);
+      return;
+    }
+    
+    progressLog = "";
+    status = 1;
+
+    DOM.start.text("Stop");
+    DOM.phrase.attr("readOnly", true);
+    addProgress("Generating possible combinations...");
+    addProgress("Progress:");
+    
+    existingPhrase = phraseToWordArray(DOM.phrase.val());
+    language = getLanguage();
+    words = WORDLISTS[language];
+
+    startTime();
+    runRecovery();
+  }
+
+  function resetRecovery() {
+    // reset
+    status = 0;
+    n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
+
+    DOM.phrase.attr("readOnly", false);
+    DOM.start.text("Start");
+    progressLog = "";
+    DOM.progress.html("");
+
+  }
+
+  function stopRecovery() {
+    // Stop and reset
+    status = 0;
+    n = {test: 0, word: 0, phrase: 0,batch: 0, batchaddr: 0, singleaddr: 0}
+
+    DOM.phrase.attr("readOnly", false);
+    DOM.start.text("Start");
+    addProgress("Aborted.");
+  }
+
+  // Process management
   // Time-consuming loops can completely lock up the browser, so we use timeouts to break up each loop into segments and give the browser time to do other things in between. 
   // At the end of each segment, call runRecovery with settimeout, and based on the global "status" runrecovery will call the next segment to run.
   
+  /*
+   * Status:
+   *    0 Stopped
+   *    1 Calculating phrases
+   *    2 Calculating addresses / Sending batches to API
+   *    3 Finished calculating addresses
+   *    4 Found a hit, narrowing it down via API
+   *    5 Done.
+   */
+
   function runRecovery() {
     switch (status) {
       case 0:
@@ -151,15 +163,30 @@
         break;
       case 2:
         calculateAddresses();
+        if ((new Date() - apiTimer) > 10000) {
+          console.log("timed");
+          apiTimer = new Date();
+          checkAddressBatch();
+        }
         break;
       case 3:
+        if ((new Date() - apiTimer) > 10000) {
+          console.log("timed");
+          apiTimer = new Date();
+          checkAddressBatch();
+        }
         break;
       case 4:
-        divideAndConquer();
+        if ((new Date() - apiTimer) > 5000) {
+          console.log("timed");
+          apiTimer = new Date();
+          divideAndConquer();
+        }
         break;
       case 5:
         break;
     }
+    setTimeout(runRecovery, 0);
   }
 
 // Recovery methods
@@ -182,8 +209,6 @@
       addProgress("Progress:");
     
       startTime();
-      setTimeout(checkAddressBatch, 10000);
-      setTimeout(runRecovery, 0);
       return;
     }
     
@@ -235,7 +260,6 @@
         break;
       }
     }
-    setTimeout(runRecovery, 0);
   }
 
   function calculateAddresses() {
@@ -247,63 +271,71 @@
       return;
     }
 
+    // Put 128 addresses in each batch -- divideAndConquer is most efficient with a 2^n number of addresses  
+    if (batches[batches.length - 1].length >= 128) {
+      console.log("Starting new batch");
+      batches.push([]);
+    }
+
     calcBip32RootKeyFromSeed(possiblePhrases[n.phrase], "");
     calcBip32ExtendedKey("m/0'/0");
 
     var key = bip32ExtendedKey.derive(0);
 
-    batches[n.batch].push({ phrase: possiblePhrases[n.phrase], address: key.getAddress().toString()});
+    batches[batches.length - 1].push({ phrase: possiblePhrases[n.phrase], address: key.getAddress().toString()});
           
     updateProgress("Progress: " + n.phrase + " / "+ possiblePhrases.length + " (" + timeLeft(n.phrase, possiblePhrases.length - n.phrase) + " remaining)");
     n.phrase++;
-    setTimeout(runRecovery, 0);
   }
-
-  // TODO Checkaddressbatch timeout doesn't stop if on status 3. Should stop. Also, if before last api reply but after last request sent, should say "thinking..." or something. If we find a hit, it shouldn't show up.
-
 
   // The API is rate limited, so we ask for the status of multiple keys with one call
   function checkAddressBatch() {
-    console.log("Sending batch " + n.batch);
 
-    if (status == 0) return; 
+    if (status == 0) return;
+    
+    // If no batches are ready yet, wait
+    if (batches.length < 2 && status != 3) {      
+      return;
+    } 
     
     var addressList = "";
-    var currBatch = n.batch;
-    n.batch++;
-    batches[n.batch] = [];
 
-    for (var i = 0; i < batches[currBatch].length; i++) {
-      addressList += batches[currBatch][i].address;
-      if (i < batches[currBatch].length - 1) addressList += "|";
-      n.batchaddr++;
+    for (var i = 0; i < batches[0].length; i++) {
+      addressList += batches[0][i].address;
+      if (i < batches[0].length - 1) addressList += "|";
     }
       
-    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList, function (data) {
+    console.log("Sending batch (" + (batches.length - 1) + " waiting)");
 
-      //TODO error handling. Set status to 0 and push error if API problem.
+    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList).done(function (data) {
 
       if (data != 0) {
         status = 4;
 
         // Get number of divides required, so we can give a visual indicator
-        n.totalsingleaddr = calcSplitTimes(batches[currBatch].length);
+        n.totalsingleaddr = calcSplitTimes(batches[0].length);
 
-        splitBatch(batches[currBatch]);
+        splitBatch(batches[0]);
         
         updateProgress("Progress: " + n.phrase + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
         addProgress("Found something, analyzing...");
         addProgress("Progress:");
 
-        setTimeout(runRecovery, 0);
-
       } else {
         console.log("Got no hits.");
-        if (n.batchaddr >= possiblePhrases.length) {
+        if (status == 3 && batches.length <= 1) {
           fail();
         } else {
-          setTimeout(checkAddressBatch, 10000);
+          batches.shift();
         }
+      }
+    }).fail(function (data) {
+      errorCount++;
+      if (errorCount > 4) {
+        showValidationError("Connectivity errors. Please try again later.");
+        stopRecovery();
+      } else {
+        apiTimer = new Date() - 5000;
       }
     });  
   }
@@ -317,7 +349,7 @@
     }
 
     console.log(addressList);    
-    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList, function (data) {
+    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList).done(function (data) {
 
       updateProgress("Progress: " + n.singleaddr + " / " + n.totalsingleaddr);
       n.singleaddr++;
@@ -330,7 +362,7 @@
         } else {
           console.log("Found in batch one, splitting " + batch1.length + " addresses into two.");
           splitBatch(batch1);
-          setTimeout(runRecovery, 5000);
+          apiTimer = new Date() - 5000;
         }
       } else {
         if (batch2.length == 1) {
@@ -340,9 +372,11 @@
         } else {
           console.log("Found in batch two, splitting " + batch2.length + " addresses into two.");
           splitBatch(batch2);
-          setTimeout(runRecovery, 5000);
+          apiTimer = new Date() - 5000;
         }
-      }        
+      }
+    }).fail(function (data) {
+      apiTimer = new Date() - 7000;
     });      
   }
 
