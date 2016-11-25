@@ -110,7 +110,7 @@
 // Button actions
 
   function startRecovery() {
-    var validated = findPhraseErrors(DOM.phrase.val());    
+    var validated = findPhraseErrors(DOM.phrase.val().toLowerCase());    
     if (validated != false) {
       showValidationError(validated);
       return;
