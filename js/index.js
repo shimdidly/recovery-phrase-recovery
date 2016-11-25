@@ -46,6 +46,7 @@
   
   var errorCount = 0;
   var processTimer;
+  var apiTimer = 0;
 
   function init() {
     // Events
@@ -125,7 +126,7 @@
     DOM.phrase.attr("readOnly", false);
     DOM.start.text("Start");
     progressLog = "";
-    DOM.progress.html = "";
+    DOM.progress.html("");
 
   }
 
@@ -162,24 +163,30 @@
         break;
       case 2:
         calculateAddresses();
-        if (stopTime() > 10) {
+        if ((new Date() - apiTimer) > 10000) {
+          console.log("timed");
+          apiTimer = new Date();
           checkAddressBatch();
-          startTime();
         }
         break;
       case 3:
-        if (stopTime() > 10) {
+        if ((new Date() - apiTimer) > 10000) {
+          console.log("timed");
+          apiTimer = new Date();
           checkAddressBatch();
-          startTime();
         }
-        setTimeout(runRecovery, 1000);
         break;
       case 4:
-        divideAndConquer();
+        if ((new Date() - apiTimer) > 5000) {
+          console.log("timed");
+          apiTimer = new Date();
+          divideAndConquer();
+        }
         break;
       case 5:
         break;
     }
+    setTimeout(runRecovery, 0);
   }
 
 // Recovery methods
@@ -202,7 +209,6 @@
       addProgress("Progress:");
     
       startTime();
-      setTimeout(runRecovery, 0);
       return;
     }
     
@@ -254,7 +260,6 @@
         break;
       }
     }
-    setTimeout(runRecovery, 0);
   }
 
   function calculateAddresses() {
@@ -281,7 +286,6 @@
           
     updateProgress("Progress: " + n.phrase + " / "+ possiblePhrases.length + " (" + timeLeft(n.phrase, possiblePhrases.length - n.phrase) + " remaining)");
     n.phrase++;
-    setTimeout(runRecovery, 0);
   }
 
   // The API is rate limited, so we ask for the status of multiple keys with one call
@@ -317,15 +321,12 @@
         addProgress("Found something, analyzing...");
         addProgress("Progress:");
 
-        setTimeout(runRecovery, 0);
-
       } else {
         console.log("Got no hits.");
         if (status == 3 && batches.length <= 1) {
           fail();
         } else {
           batches.shift();
-          setTimeout(checkAddressBatch, 10000);
         }
       }
     }).fail(function (data) {
@@ -334,7 +335,7 @@
         showValidationError("Connectivity errors. Please try again later.");
         stopRecovery();
       } else {
-        setTimeout(checkAddressBatch, 2000);
+        apiTimer = new Date() - 5000;
       }
     });  
   }
@@ -361,7 +362,7 @@
         } else {
           console.log("Found in batch one, splitting " + batch1.length + " addresses into two.");
           splitBatch(batch1);
-          setTimeout(runRecovery, 5000);
+          apiTimer = new Date() - 5000;
         }
       } else {
         if (batch2.length == 1) {
@@ -371,11 +372,11 @@
         } else {
           console.log("Found in batch two, splitting " + batch2.length + " addresses into two.");
           splitBatch(batch2);
-          setTimeout(runRecovery, 5000);
+          apiTimer = new Date() - 5000;
         }
       }
     }).fail(function (data) {
-      setTimeout(runRecovery, 2000);
+      apiTimer = new Date() - 7000;
     });      
   }
 
