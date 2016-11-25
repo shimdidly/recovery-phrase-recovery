@@ -1,0 +1,73 @@
+body {
+    padding-bottom: 32px;
+}
+.form-control[readonly] {
+    cursor: text;
+}
+.feedback-container {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    text-align: center;
+    z-index: 4;
+}
+.feedback {
+    display: table;
+    width: 100%;
+}
+.no-border {
+    border: 0;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.0);
+    -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.0);
+}
+.phrase {
+    word-break: keep-all;
+}
+.languages * {
+    padding-left: 10px;
+}
+.textcenter {
+    text-align: center;
+}
+.missingWord {
+    color: #A00;
+}
+.foundPhrase {
+    font-weight: bold;
+}
+
+.progress-container {
+    position: relative;
+    min-height: 100px;
+    overflow: hidden;
+    border: 1px solid black;
+    background: #EEE;
+    box-shadow: none;
+}
+
+.progress-container .progress {
+    background: #EEE;
+    box-shadow: none;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: auto;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.bottomlinks {
+    text-align: center;
+}
+
+@media only screen and (min-width: 992px) {
+    .bottomlinks:first-child {
+        text-align: right;
+    }
+    .bottomlinks {
+        text-align: left;
+    }
+    .progress-container {
+        height: 250px;
+    }
+}

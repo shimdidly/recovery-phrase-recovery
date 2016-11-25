@@ -1,196 +1,149 @@
 <!DOCTYPE html>
 <html>
-    <head lang="en">
-        <meta charset="utf-8" />
-        <title>Bitcoin Recovery Phrase Recovery</title>
-        <link rel="stylesheet" href="css/bootstrap.min.css">
-        <meta content="Recovery tool for incomplete or incorrect 12-word bitcoin recovery phrases" name="description"/>
-        <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-        <meta content="James MacWhyte" name="author" />
+<head lang="en">
+  <meta charset="utf-8" />
+  <title>Bitcoin Recovery Phrase Recovery</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <meta content="Recovery tool for incomplete or incorrect 12-word bitcoin recovery phrases" name="description"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta content="James MacWhyte" name="author" />
+  <link rel="stylesheet" type="text/css" href="css/main.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center">Recovery Phrase Recovery Tool</h1>
+    <hr>
+    <div class="row">
+      <div class="col-md-12">
+        <h3>What is it?</h3>
+        <p>
+          If you wrote down a BIP32/breadwallet 12-word recovery phrase, but
+          somehow ended up with only 11 words or your phrase is considered invalid
+          , this tool can try to repair your phrase for you.
+        </p>
+        <p>
+          To use this tool, you must have EITHER 11 words of your phrase in the
+          correct order, OR 12 words of your phrase with one of the words being
+          incorrect (resulting in a "bad phrase" error message).
+        </p>
+        <h3>Disclaimer</h3>
+        <p>
+          <b>This page is not affiliated with any company or product</b>, and is
+          provided as-is for users who are interested in using it. By using this
+          site, you agree to assume all risk. The author of this software will not
+          be held responsible if the security of your bitcoin wallet is
+          compromised as a result of using this site.
+        </p>
+        <p>
+          That said, this software is 100% open source, and has been checked to
+          ensure it is safe to use.
+        </p>
+      </div>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-md-12">
+        If you understand the risks and wish to continue, enter your phrase as you
+        have it written down in the box below, and click "start" to begin.
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <br>
+        <form>
+          <div class="form-group">
+            <input id="phrase" class="phrase form-control"></input>
+          </div>
+          <div class="form-group">
+            <button class="btn start">Start</button>
+          </div>
+          <div class="form-group progress-container">
+            <div class="progress"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-md-12 textcenter">
+        <h3>Source code</h3>
+        <p>
+          <a href="https://github.com/jmacwhyte/recovery-phrase-recovery" target="_blank">
+            https://github.com/jmacwhyte/recovery-phrase-recovery
+          </a>
+        </p>
+        <h3>Libraries</h3>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-6 bottomlinks">
+        <p>
+          <span>BitcoinJS - </span>
+          <a href="https://github.com/bitcoinjs/bitcoinjs-lib" target="_blank">
+            https://github.com/bitcoinjs/bitcoinjs-lib
+          </a>
+        </p>
 
-        <style>
-            body {
-                padding-bottom: 32px;
-            }
-            .form-control[readonly] {
-                cursor: text;
-            }
-            .feedback-container {
-                position: fixed;
-                top: 0;
-                width: 100%;
-                text-align: center;
-                z-index: 4;
-            }
-            .feedback {
-                display: table;
-                padding: 0.5em 1em;
-                background-color: orange;
-                margin: 0 auto;
-                font-size: 2em;
-                color: #444;
-                border: 2px solid #555;
-                border-top: 0;
-                border-bottom-left-radius: 20px 20px;
-                border-bottom-right-radius: 20px 20px;
-            }
-            .no-border {
-                border: 0;
-                box-shadow: inset 0 1px 1px rgba(0,0,0,.0);
-                -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.0);
-            }
-            .phrase {
-                word-break: keep-all;
-            }
-            .languages * {
-                padding-left: 10px;
-            }
-            .progress {
-                padding: 10px;
-                height: 250px;
-                border: 1px solid black;
-                background: #EEE;
-            }
-            .textright {
-                text-align: right;
-            }
-            .textcenter {
-                text-align: center;
-            }
-            .missingWord {
-                color: #A00;
-            }
-            .foundPhrase {
-                font-weight: bold;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
+        <p>
+          <span>jsBIP39 - </span>
+          <a href="https://github.com/iancoleman/jsbip39" target="_blank">
+            https://github.com/iancoleman/jsbip39
+          </a>
+        </p>
 
-            <h1 class="text-center">Recovery Phrase Recovery Tool</h1>
-            <hr>
-            <div class="row">        
-                <div class="col-sm-2"></div>
-                <div class="col-sm-8">
-                    <h3>What is it?</h3>
-                    <p>If you wrote down a BIP32/breadwallet 12-word recovery phrase, but somehow ended up with only 11 words or your phrase is considered invalid, this tool can try to repair your phrase for you.
-                        To use this tool, you must have EITHER 11 words of your phrase in the correct order, OR 12 words of your phrase with one of the words being incorrect (resulting in a "bad phrase" error message). 
-                    <h3>Disclaimer</h3>
-                    <p><b>This page is not affiliated with any company or product</b>, and is provided as-is for users who are interested in using it. By using this site, you agree to assume all risk. The author of this software will not be held responsible if the security of your bitcoin wallet is compromised as a result of using this site.</p>
-                    <p>That said, this software is 100% open source, and has been checked to ensure it is safe to use.</p>
-                </div>
-            </div>
-            <hr>            
-            <div class="row">
-                <div class="col-sm-2"></div>
-                <div class="col-sm-7">If you understand the risks and wish to continue, enter your phrase as you have it written down in the box below, and click "start" to begin.</div>
+        <p>
+          <span>sjcl - </span>
+          <a href="https://github.com/bitwiseshiftleft/sjcl" target="_blank">
+            https://github.com/bitwiseshiftleft/sjcl
+          </a>
+        </p>
+      </div>
+      <div class="col-md-6 bottomlinks">
+        <p>
+          <span>jQuery - </span>
+          <a href="https://jquery.com/" target="_blank">
+            https://jquery.com/
+          </a>
+        </p>
 
-            </div>
-            <div class="row">        
-                <div class="col-sm-2"></div>
-                    <form class="form-horizontal" role="form">
-                        <div class="form-group">
-                            <div class="col-sm-7">
-                                <input id="phrase" class="phrase form-control"></input>
-                            </div>
-                            <div class="col-sm-2">
-                                <button class="btn start">Start</button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-2"></div>
-                            <div class="progress col-sm-8"></div>
-                        </div>
-                    </form>
-                </div>
-            </div>
+        <p>
+          <span>Twitter Bootstrap - </span>
+          <a href="http://getbootstrap.com/" target="_blank">
+            http://getbootstrap.com/
+          </a>
+        </p>
 
-            <hr>
+      </div>
+    </div>
 
-            <div class="row">
-                <div class="col-md-12 textcenter">
+  </div>
 
-                    <h3>Source code</h3>
+  <div class="feedback-container">
+  <div class="feedback alert alert-danger">Loading...</div>
+  </div>
 
-                    <p>
-                        <a href="https://github.com/jmacwhyte/recovery-phrase-recovery" target="_blank">
-                            https://github.com/jmacwhyte/recovery-phrase-recovery
-                        </a>
-                    </p>
-
-                    <h3>Libraries</h3>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6 textright">
-                    <p>
-                        <span>BitcoinJS - </span>
-                        <a href="https://github.com/bitcoinjs/bitcoinjs-lib" target="_blank">
-                            https://github.com/bitcoinjs/bitcoinjs-lib
-                        </a>
-                    </p>
-
-                    <p>
-                        <span>jsBIP39 - </span>
-                        <a href="https://github.com/iancoleman/jsbip39" target="_blank">
-                            https://github.com/iancoleman/jsbip39
-                        </a>
-                    </p>
-
-                    <p>
-                        <span>sjcl - </span>
-                        <a href="https://github.com/bitwiseshiftleft/sjcl" target="_blank">
-                            https://github.com/bitwiseshiftleft/sjcl
-                        </a>
-                    </p>
-                </div>
-                <div class="col-md-6">
-                    <p>
-                        <span>jQuery - </span>
-                        <a href="https://jquery.com/" target="_blank">
-                            https://jquery.com/
-                        </a>
-                    </p>
-
-                    <p>
-                        <span>Twitter Bootstrap - </span>
-                        <a href="http://getbootstrap.com/" target="_blank">
-                            http://getbootstrap.com/
-                        </a>
-                    </p>
-
-                </div>
-            </div>
-
-        </div>
-
-        <div class="feedback-container">
-            <div class="feedback">Loading...</div>
-        </div>
-
-        <script type="text/template" id="address-row-template">
-            <tr>
-                <td class="index"><span></span></td>
-                <td class="address"><span></span></td>
-                <td class="pubkey"><span></span></td>
-                <td class="privkey"><span></span></td>
-            </tr>
-        </script>
-        <script src="js/jquery.min.js"></script>
-        <script src="js/bootstrap.min.js"></script>
-        <script src="js/levenshtein.js"></script>
-        <script src="js/bitcoinjs-1-5-7.js"></script>
-        <script src="js/bitcoinjs-extensions.js"></script>
-        <script src="js/sjcl-bip39.js"></script>
-        <script src="js/wordlist_english.js"></script>
-        <script src="js/wordlist_japanese.js"></script>
-        <script src="js/wordlist_spanish.js"></script>
-        <script src="js/wordlist_chinese_simplified.js"></script>
-        <script src="js/wordlist_chinese_traditional.js"></script>
-        <script src="js/wordlist_french.js"></script>
-        <script src="js/wordlist_italian.js"></script>
-        <script src="js/jsbip39.js"></script>
-        <script src="js/index.js"></script>
-    </body>
+  <script type="text/template" id="address-row-template">
+    <tr>
+      <td class="index"><span></span></td>
+      <td class="address"><span></span></td>
+      <td class="pubkey"><span></span></td>
+      <td class="privkey"><span></span></td>
+    </tr>
+  </script>
+  <script src="js/jquery.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/levenshtein.js"></script>
+  <script src="js/bitcoinjs-1-5-7.js"></script>
+  <script src="js/bitcoinjs-extensions.js"></script>
+  <script src="js/sjcl-bip39.js"></script>
+  <script src="js/wordlist_english.js"></script>
+  <script src="js/wordlist_japanese.js"></script>
+  <script src="js/wordlist_spanish.js"></script>
+  <script src="js/wordlist_chinese_simplified.js"></script>
+  <script src="js/wordlist_chinese_traditional.js"></script>
+  <script src="js/wordlist_french.js"></script>
+  <script src="js/wordlist_italian.js"></script>
+  <script src="js/jsbip39.js"></script>
+  <script src="js/index.js"></script>
+</body>
 </html>
