@@ -18,9 +18,6 @@
   DOM.pending = $(".pending");
   DOM.progress = $(".progress");
 
-  // Set default phrase, for testing only (remove this)  
-  //DOM.phrase.val("find express cupboard witness quick able debris town online east soda");
-  //DOM.phrase.val("axis husband project any sea time drip tip spirit tide bring belt");
   var possiblePhrases = [];
   var batches = [[]];
   var batch1, batch2;
@@ -152,7 +149,7 @@
 
   // Process management
   // Time-consuming loops can completely lock up the browser, so we use timeouts to break up each loop into segments and give the browser time to do other things in between. 
-  // At the end of each segment, call runRecovery with settimeout, and based on the global "status" runrecovery will call the next segment to run.
+  // At the end of each segment, call runRecovery with settimeout, and based on the global "status" runRecovery will call the next segment to run.
   
   /*
    * Status:
@@ -199,7 +196,7 @@
     setTimeout(runRecovery, 0);
   }
 
-// Recovery methods
+  // Recovery methods
 
   function generatePhrases() {
     
@@ -298,7 +295,7 @@
     n.phrase++;
   }
 
-  // The API is rate limited, so we ask for the status of multiple keys with one call
+  // The API is rate limited　by number of calls but not by number of queries per call, so we ask for the status of multiple keys with one call
   function checkAddressBatch() {
 
     if (status == 0) return;
@@ -351,6 +348,8 @@
   }
 
   function divideAndConquer() {
+    // We know one address in the latest batch has a balance, but we don't know which. By testing half the addresses,
+    // throwing away the half that doesn't have a hit, and repeating, we can narrow it down in just a couple steps.
 
     var addressList = "";    
     for (var i = 0; i < batch1.length; i++) {
@@ -405,6 +404,36 @@
     }
   }
 
+  // Graphical
+
+  function showValidationError(errorText) {
+    hidePending();
+    DOM.feedback
+      .text(errorText)
+      .show();
+  }
+
+  function hideValidationError() {
+    DOM.feedback
+      .text("")
+      .hide();
+  }
+
+  function showPending() {
+    hideValidationError();
+    DOM.pending
+      .text("Checking...")
+      .show();
+  }
+
+  function hidePending() {
+    DOM.pending
+      .text("")
+      .hide();
+  }
+
+  // Address generation and other tools
+
   function calcBip32RootKeyFromSeed(phrase, passphrase) {
     seed = mnemonic.toSeed(phrase, passphrase);
     bip32RootKey = bitcoin.HDNode.fromSeedHex(seed, network);
@@ -428,19 +457,6 @@
         bip32ExtendedKey = bip32ExtendedKey.derive(index);
       }
     }
-  }
-
-  function showValidationError(errorText) {
-    hidePending();
-    DOM.feedback
-      .text(errorText)
-      .show();
-  }
-
-  function hideValidationError() {
-    DOM.feedback
-      .text("")
-      .hide();
   }
 
   function findPhraseErrors(phrase) {
@@ -470,19 +486,6 @@
       return defaultVal;
     }
     return v;
-  }
-
-  function showPending() {
-    hideValidationError();
-    DOM.pending
-      .text("Checking...")
-      .show();
-  }
-
-  function hidePending() {
-    DOM.pending
-      .text("")
-      .hide();
   }
 
   function findNearestWord(word) {
@@ -584,6 +587,8 @@
     }
     return phrase;
   }
+
+  // Output-related
 
   function addProgress(text) {
     progressLog += text + "<br>";
