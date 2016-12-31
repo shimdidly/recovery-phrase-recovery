@@ -94,8 +94,7 @@ body {
 
 .progress-container {
     position: relative;
-    min-height: 100px;
-    overflow: hidden;
+    min-height: 250px;
     border: 1px solid black;
     background: #EEE;
     box-shadow: none;
@@ -104,9 +103,6 @@ body {
 .progress-container .progress {
     background: #EEE;
     box-shadow: none;
-    position: absolute;
-    left: 0;
-    bottom: 0;
     height: auto;
     width: 100%;
     margin-bottom: 0;
@@ -139,7 +135,19 @@ body {
     .bottomlinks {
         text-align: left;
     }
-    .progress-container {
-        height: 250px;
+}
+
+@media only screen and (max-width: 560px) {
+    .foundPhrase {
+        padding-top: 30px;
+        padding-right: 0px;
+    }
+
+    .donation-image {
+        display: none;
+    }
+
+    .donation-box {
+        padding-right: 20px;
     }
 }
