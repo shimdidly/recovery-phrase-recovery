@@ -133,6 +133,8 @@
       progressLog = "";
       DOM.progress.html("");
     } else {
+      batches = [[]];
+      possiblePhrases = [];
       addProgress("Aborted.");
     }
  
@@ -301,7 +303,7 @@
     updateProgress("Progress: " + n.phrase + " / "+ possiblePhrases.length + " (" + timeLeft(n.phrase, possiblePhrases.length - n.phrase) + " remaining)");
     n.phrase++;
   }
-
+  
   function checkAddressBatch() {
 
     if (status == 0) return;
@@ -354,9 +356,24 @@
   }
 
   var batch1, batch2;
+  
+  function splitBatch(batch) {
+    var oldBatch = batch;
+    var cutoff = Math.floor(batch.length / 2);
+    batch1 = [];
+    batch2 = [];
 
+    for (var i = 0; i < cutoff; i++) {
+      batch1.push(batch[i]);
+    }
+
+    for (; cutoff < batch.length; cutoff++) {
+      batch2.push(batch[cutoff]);
+    }
+  }
+  
   function divideAndConquer() {
-
+    
     var addressList = "";    
     for (var i = 0; i < batch1.length; i++) {
       addressList += batch1[i].address;
@@ -390,21 +407,6 @@
     }).fail(function (data) {
       apiTimer = new Date() - 7000;
     });      
-  }
-
-  function splitBatch(batch) {
-    var oldBatch = batch;
-    var cutoff = Math.floor(batch.length / 2);
-    batch1 = [];
-    batch2 = [];
-
-    for (var i = 0; i < cutoff; i++) {
-      batch1.push(batch[i]);
-    }
-
-    for (; cutoff < batch.length; cutoff++) {
-      batch2.push(batch[cutoff]);
-    }
   }
 
   var metrics;
