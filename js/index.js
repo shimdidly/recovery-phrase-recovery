@@ -119,7 +119,7 @@
     addProgress("Generating possible combinations...");
     addProgress("Progress:");
     
-    existingPhrase = phraseToWordArray(DOM.phrase.val().toLowerCase());
+    existingPhrase = phraseToWordArray(mnemonic.normalizeString(DOM.phrase.val().toLowerCase()));
     language = getLanguage();
     words = WORDLISTS[language];
 
@@ -180,6 +180,7 @@
         if ((new Date() - apiTimer) > 10000) {
           apiTimer = new Date();
           checkAddressBatch();
+          updateProgress("Reviewing... (" + ((batches.length-1) * 10) + " seconds remaining)");
         }
         break;
       case 4:
@@ -287,8 +288,8 @@
       return;
     }
 
-    // Put 128 addresses in each batch -- divideAndConquer is most efficient with a 2^n number of addresses  
-    if (batches[batches.length - 1].length >= 128) {
+    // Put 64 addresses in each batch -- divideAndConquer is most efficient with a 2^n number of addresses  
+    if (batches[batches.length - 1].length >= 64) {
       console.log("Starting new batch");
       batches.push([]);
     }
