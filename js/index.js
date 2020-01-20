@@ -1,8 +1,5 @@
 (function() {
 
-  // If you don't want to send anonymous usage statistics, change this to false  
-  var sendMetrics = true;
-
   // mnemonics is populated as required by getLanguage
   var mnemonics = { "english": new Mnemonic("english") };
   var mnemonic = mnemonics["english"];
@@ -155,9 +152,8 @@
    *    0 Stopped
    *    1 Calculating phrases
    *    2 Calculating addresses / Sending batches to API
-   *    3 Finished calculating addresses
-   *    4 Found a hit, narrowing it down via API
-   *    5 Done.
+   *    3 Finished calculating addresses / Continue sending batches to API
+   *    4 Done.
    */
   
   var status = 0;
@@ -180,16 +176,10 @@
         if ((new Date() - apiTimer) > 10000) {
           apiTimer = new Date();
           checkAddressBatch();
-          updateProgress("Reviewing... (" + ((batches.length-1) * 10) + " seconds remaining)");
+          updateProgress("Waiting for scan to complete, please wait... (" + ((batches.length-1) * 10) + " seconds remaining)");
         }
         break;
       case 4:
-        if ((new Date() - apiTimer) > 5000) {
-          apiTimer = new Date();
-          divideAndConquer();
-        }
-        break;
-      case 5:
         break;
     }
     setTimeout(runRecovery, 0);
@@ -198,12 +188,10 @@
   // Recovery methods
   //
   // 1. Generate all possible phrases given the entered information
-  // 2. Calculate the first address for each phrase. If a phrase has been used before, it's first address will have a history
+  // 2. Calculate the first address for each phrase. If a phrase has been used before, it's first
+  // address will have a history
   // 3. Check address batches for a batch that includes an address with a history.
-  //    (The API is rate limited　by number of calls but not by number of queries per call, so we ask for the status of multiple keys with one call)
-  // 4. "Divide and Conquer" the batch that had a hit to find the single address. We know one address in the latest batch has a balance, but we don't
-  //    know which. By testing half the addresses, throwing away the half that doesn't have a hit, and repeating, we can narrow it down in just a couple steps.
-
+  
   var possiblePhrases = [];
 
   function generatePhrases() {
@@ -269,7 +257,6 @@
 
       if (n.word % 100 == 0) {
         var done = (n.word + (n.test * 2048));
-        var remaining = 24576 - done;
         updateProgress("Progress: " + done + " / 24576");
         n.word++
         break;
@@ -284,12 +271,12 @@
       // Finished calculating addresses. Just waiting on api callbacks.
       status = 3;
       updateProgress("Progress: " + possiblePhrases.length + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
-      addProgress("Reviewing...")
+      addProgress("Waiting for scan to complete, please wait...")
       return;
     }
 
-    // Put 64 addresses in each batch -- divideAndConquer is most efficient with a 2^n number of addresses  
-    if (batches[batches.length - 1].length >= 64) {
+    // Create batches of 100 addresses
+    if (batches[batches.length - 1].length >= 101) {
       console.log("Starting new batch");
       batches.push([]);
     }
@@ -299,7 +286,7 @@
 
     var key = bip32ExtendedKey.derive(0);
 
-    batches[batches.length - 1].push({ phrase: possiblePhrases[n.phrase], address: key.getAddress().toString()});
+    batches[batches.length - 1].push({ address: key.getAddress().toString(), phrase: possiblePhrases[n.phrase] });
           
     updateProgress("Progress: " + n.phrase + " / "+ possiblePhrases.length + " (" + timeLeft(n.phrase, possiblePhrases.length - n.phrase) + " remaining)");
     n.phrase++;
@@ -307,7 +294,7 @@
   
   function checkAddressBatch() {
 
-    if (status == 0) return;
+    if (status < 2) return;
     
     // If no batches are ready yet, wait
     if (batches.length < 2 && status != 3) {      
@@ -315,37 +302,42 @@
     } 
     
     var addressList = "";
+    var phraseList = {};
 
-    for (var i = 0; i < batches[0].length; i++) {
-      addressList += batches[0][i].address;
-      if (i < batches[0].length - 1) addressList += "|";
+    var b = batches[0];
+
+    for (var i = 0; i < b.length; i++) {
+      var n = b[i];
+      addressList += n.address;
+      if (i < b.length - 1) addressList += "|";
+      phraseList[n.address] = n.phrase;
     }
       
-    console.log("Sending batch (" + (batches.length - 1) + " waiting)");
-
-    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList).done(function (data) {
-
-      if (data != 0) {
-        status = 4;
-
-        // Get number of divides required, so we can give a visual indicator
-        n.totalsingleaddr = calcSplitTimes(batches[0].length);
-
-        splitBatch(batches[0]);
-        
-        updateProgress("Progress: " + n.phrase + " / " + possiblePhrases.length + " (Took " + parseTime(stopTime()) + ")");
-        addProgress("Found something, analyzing...");
-        addProgress("Progress: 0 / 7");
-
-      } else {
-        console.log("Got no hits.");
-        if (status == 3 && batches.length <= 1) {
-          fail();
-        } else {
-          batches.shift();
+    fetch("https://blockchain.info/multiaddr?n=1&cors=true&active=" + addressList)
+    .then((resp) => resp.json())
+    .then(function (data) {
+      var a = data.addresses
+      for (var i = 0; i < a.length; i++) {
+        var n = a[i]
+        if (n.total_received > 0) {
+          // We got a match!
+          status = 4;
+          succeed(phraseList[n.address]);
+          return;
         }
       }
-    }).fail(function (data) {
+
+      // No hits
+      console.log("Got no hits.");
+      if (status == 3 && batches.length <= 1) {
+        fail();
+      } else {
+        batches.shift();
+      }
+  
+    })
+    .catch(function (error) {
+      console.log(error)
       errorCount++;
       if (errorCount > 4) {
         showValidationError("Connectivity errors. Please try again later.");
@@ -354,171 +346,6 @@
         apiTimer = new Date() - 5000;
       }
     });  
-  }
-
-  var batch1, batch2;
-  
-  function splitBatch(batch) {
-    var oldBatch = batch;
-    var cutoff = Math.floor(batch.length / 2);
-    batch1 = [];
-    batch2 = [];
-
-    for (var i = 0; i < cutoff; i++) {
-      batch1.push(batch[i]);
-    }
-
-    for (; cutoff < batch.length; cutoff++) {
-      batch2.push(batch[cutoff]);
-    }
-  }
-  
-  function divideAndConquer() {
-    
-    var addressList = "";    
-    for (var i = 0; i < batch1.length; i++) {
-      addressList += batch1[i].address;
-      if (i < batch1.length - 1) addressList += "|";
-    }
-
-    $.get("https://blockchain.info/q/getreceivedbyaddress/" + addressList).done(function (data) {
-
-      updateProgress("Progress: " + n.singleaddr + " / " + n.totalsingleaddr);
-      n.singleaddr++;
-
-      if (data != 0) {
-        if (batch1.length == 1) {
-          succeed(batch1[0].phrase);
-          return;
-        } else {
-          console.log("Found in batch one, splitting " + batch1.length + " addresses into two.");
-          splitBatch(batch1);
-          apiTimer = new Date() - 5000;
-        }
-      } else {
-        if (batch2.length == 1) {
-          succeed(batch2[0].phrase);
-          return;
-        } else {
-          console.log("Found in batch two, splitting " + batch2.length + " addresses into two.");
-          splitBatch(batch2);
-          apiTimer = new Date() - 5000;
-        }
-      }
-    }).fail(function (data) {
-      apiTimer = new Date() - 7000;
-    });      
-  }
-
-  var metrics;
-
-  function collectMetrics(phrase) {
-    metrics = {
-      recovered: 0,
-      step: 0,
-      batchNo: 0,
-      lastUsed: 0,
-      changeLast: 0,
-      error: 0
-    }
-
-    calcBip32RootKeyFromSeed(phrase, "");
-    runMetrics();
-  }
-
-  function runMetrics() {
-    if (status != 5) return;
-
-    var chain;
-    var searchtype;
-
-    if (metrics.step <= 1) {
-      chain = "m";
-    } else {
-      chain = "c";
-    }
-
-    if (metrics.step == 0 || metrics.step == 2) {
-      searchtype = "u";      
-    } else {
-      searchtype = "b";
-    }
-    
-    chain == "m" ? calcBip32ExtendedKey("m/0'/0") : calcBip32ExtendedKey("m/0'/1");
-
-    if (searchtype == "u") {
-
-      var batch = metrics.batchNo * 100 + 100;
-
-      $.get("https://blockchain.info/q/getreceivedbyaddress/" +
-        bip32ExtendedKey.derive(batch).getAddress().toString()).done(function (data) {
-
-        if (data == 0) {
-          metrics.lastUsed = metrics.batchNo;
-          metrics.batchNo = 0;
-          metrics.step++;
-        } else {
-          metrics.batchNo++;
-        }
-      
-        setTimeout(runMetrics(), 3000);
-    
-      }).fail(function (data) {
-        metrics.error++;
-        if (metrics.error < 4) {
-          setTimeout(runMetrics(), 3000);
-        } else {
-          reportMetrics(metrics.recovered, false);
-        }
-      }); 
-
-    } else {
-
-      var addresses = "";
-
-      var batch = metrics.batchNo * 100;
-
-      for (var i = batch; i < batch + 100; i++) {
-        addresses += bip32ExtendedKey.derive(i).getAddress().toString() + "|";
-      }
-
-      $.get("https://blockchain.info/q/addressbalance/" + addresses).done(function (data) { 
-        metrics.recovered += parseInt(data);
-      
-        metrics.batchNo++;
-
-        if (metrics.batchNo >= metrics.lastUsed) {
-          if (metrics.step >= 3) {
-            reportMetrics(metrics.recovered, true);
-          } else {
-            metrics.step++;
-            metrics.batchNo = 0;
-            metrics.lastUsed = 0;
-            setTimeout(runMetrics(), 3000);
-          }
-        } else {
-          setTimeout(runMetrics(), 3000);
-        }
-    
-      }).fail(function (data) {
-        metrics.error++;
-        if (metrics.error < 4) {
-          setTimeout(runMetrics(), 3000);
-        } else {
-          reportMetrics(metrics.recovered, false);
-        }
-      });
-    }   
-  }
-
-  function reportMetrics(amount, success) {
-    $.get("https://script.google.com/macros/s/AKfycbzPhMYQt60UsnZbCgSgRtgE4ujINFctCHRrzErVhcT7qAU74KvG/exec" +
-      "?amount=" + metrics.recovered + "&success=" + success).fail(function (data, text, error) {
-        metrics.error++;
-        if (metrics.error < 4) {
-          reportMetrics(metrics.recovered, false);
-        }
-      });
   }
 
   // Graphical
@@ -595,14 +422,6 @@
     if ((words.length < 11 || words.length > 12) && words.length != 0) return "Must have 11 or 12 words of phrase.";
     
     return false;
-  }
-
-  function parseIntNoNaN(val, defaultVal) {
-    var v = parseInt(val);
-    if (isNaN(v)) {
-      return defaultVal;
-    }
-    return v;
   }
 
   function findNearestWord(word) {
@@ -764,15 +583,14 @@
   }
 
   function succeed(phrase) {
-    status = 5;
-    if (sendMetrics) collectMetrics(phrase);
+    status = 4;
     DOM.start.text("Reset");
 
     DOM.progress.addClass("success");
     progressLog = '<div>Success! Your correct phrase is below: <br></div>' +
       '<div class="foundPhrase">' + comparePhraseForDisplay(phrase) + '</div>' +
       '<div class="donation-box">If you found this tool helpful, please consider making a donation to ' +
-      '<a href="bitcoin://3NSgVhvdMdo6roBRBTafgk1UrBZmecgANv">3NSgVhvdMdo6roBRBTafgk1UrBZmecgANv</a> ➠</div>' +
+      '<a href="bitcoin://34Nzz1xdh3FAGPoaDzFwiuSUzuTAHgA2Nr">34Nzz1xdh3FAGPoaDzFwiuSUzuTAHgA2Nr</a> ➠</div>' +
       '<img src="images/qr_code.jpg" class="donation-image">';
     
     DOM.progress.html(progressLog);
