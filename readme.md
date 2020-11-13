@@ -1,10 +1,10 @@
+This fork addresses an issue that causes the script to fail when sending the batches of addresses to blockchain.info. If you are getting an "Unexpected end of JSON", "CORS policy", or "Connectivity issues" error, then give this fork a try. 
+
+Blockchain.info's API documentation states that "|" should delimit a multi-address request, but if they are present, the request will fail with a 400 Bad Request. This script uses "," instead, which does work.
+
 # BIP39 Tool
 
 A tool for recovering 12-word bitcoin recovery phrases when you only have 11 words.
-
-## Online Version
-
-See it here: https://jmacwhyte.github.io/recovery-phrase-recovery/
 
 ## Usage
 
